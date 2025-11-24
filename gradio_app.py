@@ -4,7 +4,17 @@ import numpy as np
 import re
 import string
 
-# Load your trained model (place your model.pkl file in the same directory)
+# Load your trained vectorizer and model
+# Save your trained vectorizer as 'vectorizer.pkl' and model as 'model.pkl'
+# You can use any of your trained models: LR, DT, GB, or RF
+try:
+    with open('vectorizer.pkl', 'rb') as f:
+        vectorizer = pickle.load(f)
+    print("Vectorizer loaded successfully!")
+except FileNotFoundError:
+    print("Warning: vectorizer.pkl not found. Using mock predictions.")
+    vectorizer = None
+
 try:
     with open('model.pkl', 'rb') as f:
         model = pickle.load(f)
@@ -42,14 +52,15 @@ def analyze_news(news_text):
     # Preprocess the text
     processed_text = preprocess_text(news_text)
     
-    if model is not None:
+    if model is not None and vectorizer is not None:
         try:
-            # Get prediction probabilities
-            # Note: Adjust this based on your model's expected input format
-            # If your model uses TfidfVectorizer or CountVectorizer, you'll need to load that too
-            probabilities = model.predict_proba([processed_text])[0]
+            # Transform text using TfidfVectorizer
+            text_vectorized = vectorizer.transform([processed_text])
             
-            # Assuming binary classification: [Real, Fake] or [Fake, Real]
+            # Get prediction probabilities
+            probabilities = model.predict_proba(text_vectorized)[0]
+            
+            # Assuming binary classification: [Real=0, Fake=1]
             # Adjust index based on your model's label ordering
             fake_probability = probabilities[1] if len(probabilities) > 1 else probabilities[0]
             confidence = int(fake_probability * 100)
@@ -60,7 +71,7 @@ def analyze_news(news_text):
             is_fake = len(processed_text) % 2 == 0
             confidence = 75
     else:
-        # Mock prediction when model is not loaded
+        # Mock prediction when model or vectorizer is not loaded
         is_fake = len(processed_text) % 2 == 0
         confidence = 75
     
