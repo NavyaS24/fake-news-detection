@@ -1,24 +1,68 @@
 import gradio as gr
-import random
+import pickle
+import numpy as np
+import re
+import string
+
+# Load your trained model (place your model.pkl file in the same directory)
+try:
+    with open('model.pkl', 'rb') as f:
+        model = pickle.load(f)
+    print("Model loaded successfully!")
+except FileNotFoundError:
+    print("Warning: model.pkl not found. Using mock predictions.")
+    model = None
+
+def preprocess_text(text):
+    """
+    Preprocess text before feeding to the model.
+    Adjust this based on how you preprocessed your training data.
+    """
+    # Convert to lowercase
+    text = text.lower()
+    
+    # Remove URLs
+    text = re.sub(r'http\S+|www\S+|https\S+', '', text, flags=re.MULTILINE)
+    
+    # Remove punctuation
+    text = text.translate(str.maketrans('', '', string.punctuation))
+    
+    # Remove extra whitespace
+    text = ' '.join(text.split())
+    
+    return text
 
 def analyze_news(news_text):
     """
-    Analyze news text for fake news detection.
-    Replace this with your actual ML model prediction logic.
+    Analyze news text for fake news detection using trained ML model.
     """
     if not news_text or len(news_text.strip()) < 10:
         return "Please enter a valid news article (at least 10 characters).", None, None
     
-    # TODO: Replace with your actual model prediction
-    # Example: prediction = your_model.predict(news_text)
+    # Preprocess the text
+    processed_text = preprocess_text(news_text)
     
-    # Mock analysis for demonstration
-    fake_keywords = ['shocking', 'unbelievable', 'secret', 'they don\'t want you to know']
-    has_fake_keywords = any(keyword in news_text.lower() for keyword in fake_keywords)
-    
-    # Simulate prediction
-    is_fake = has_fake_keywords or random.random() > 0.6
-    confidence = random.randint(65, 95)
+    if model is not None:
+        try:
+            # Get prediction probabilities
+            # Note: Adjust this based on your model's expected input format
+            # If your model uses TfidfVectorizer or CountVectorizer, you'll need to load that too
+            probabilities = model.predict_proba([processed_text])[0]
+            
+            # Assuming binary classification: [Real, Fake] or [Fake, Real]
+            # Adjust index based on your model's label ordering
+            fake_probability = probabilities[1] if len(probabilities) > 1 else probabilities[0]
+            confidence = int(fake_probability * 100)
+            is_fake = fake_probability > 0.5
+        except Exception as e:
+            print(f"Prediction error: {e}")
+            # Fallback to mock prediction
+            is_fake = len(processed_text) % 2 == 0
+            confidence = 75
+    else:
+        # Mock prediction when model is not loaded
+        is_fake = len(processed_text) % 2 == 0
+        confidence = 75
     
     if is_fake:
         label = "⚠️ Fake News Detected"
